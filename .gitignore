@@ -1,6 +1,3 @@
-# Dataset ảnh (nặng, không push lên git)
-datasets/
-
 # Kết quả train
 runs/
 

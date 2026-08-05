@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names: ['plate']
+
+roboflow:
+  workspace: tiens-workspace-541uh
+  project: vietnam-license-plate-h8t3n-6uczq
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/tiens-workspace-541uh/vietnam-license-plate-h8t3n-6uczq/dataset/1

@@ -1,0 +1,12 @@
+train: D:/titsmat-parking/datasets/Vietnam license-plate.v1i.yolo26/train/images
+val: D:/titsmat-parking/datasets/Vietnam license-plate.v1i.yolo26/valid/images
+test: D:/titsmat-parking/datasets/Vietnam license-plate.v1i.yolo26/test/images
+nc: 1
+names:
+- plate
+roboflow:
+  workspace: tiens-workspace-541uh
+  project: vietnam-license-plate-h8t3n-6uczq
+  version: 1
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/tiens-workspace-541uh/vietnam-license-plate-h8t3n-6uczq/dataset/1
