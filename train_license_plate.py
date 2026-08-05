@@ -29,17 +29,18 @@ DATA_YAML   = DATASET_DIR / "data.yaml"
 # CẤU HÌNH HUẤN LUYỆN
 # ─────────────────────────────────────────────
 MODEL       = "yolov8l.pt"   # đổi sang yolov8x.pt nếu muốn độ chính xác tối đa
-EPOCHS      = 150
-IMG_SIZE    = 1280           # biển số nhỏ → cần resolution cao
-BATCH_SIZE  = 32             # ~16 GB VRAM; giảm xuống 16/8 nếu VRAM ít hơn
-WORKERS     = 8              # SSD NVMe + RAM lớn → load nhanh
-DEVICE      = 0              # 0 = GPU đầu tiên; "cpu" nếu không có GPU
+EPOCHS      = 200
+IMG_SIZE    = 640            # 640 ổn định hơn 1280 với dataset ~700 ảnh;
+                             # tăng lên 1280 sau khi model đã converge tốt
+BATCH_SIZE  = 16             # batch nhỏ hơn → gradient ổn định hơn với dataset nhỏ
+WORKERS     = 8
+DEVICE      = 0
 PROJECT     = str(ROOT / "runs" / "train")
-RUN_NAME    = "vn_plate_yolov8l_1280"
+RUN_NAME    = "vn_plate_yolov8l_stable"
 
-PATIENCE    = 30
-LR0         = 0.01
-LRF         = 0.005
+PATIENCE    = 50             # cho model đủ thời gian recover
+LR0         = 0.001          # learning rate thấp hơn nhiều – quan trọng nhất
+LRF         = 0.01           # decay đến LR0 * LRF = 1e-5
 OPTIMIZER   = "AdamW"
 AMP         = True
 
@@ -145,30 +146,36 @@ def train(data_yaml: Path, use_cache: bool = True):
         lrf            = LRF,
         optimizer      = OPTIMIZER,
         amp            = AMP,
-        # Augmentation toi uu cho bien so xe
-        hsv_h          = 0.015,
-        hsv_s          = 0.5,
-        hsv_v          = 0.4,
-        degrees        = 8.0,
-        translate      = 0.1,
-        scale          = 0.6,
-        shear          = 3.0,
-        perspective    = 0.0005,
-        flipud         = 0.0,    # bien so khong bao gio lon nguoc
+        # ── Augmentation – giảm mạnh so với trước ──
+        # Màu sắc nhẹ thôi, biển số VN màu khá chuẩn
+        hsv_h          = 0.01,
+        hsv_s          = 0.3,
+        hsv_v          = 0.3,
+        # Hình học – biển số gắn cố định, không xoay nhiều
+        degrees        = 5.0,
+        translate      = 0.05,
+        scale          = 0.4,
+        shear          = 1.0,
+        perspective    = 0.0,
+        flipud         = 0.0,   # bien so khong bao gio lon nguoc
         fliplr         = 0.5,
+        # Mosaic giữ nhưng tắt mixup và copy_paste
+        # – dataset nhỏ, 2 kỹ thuật này cùng lúc gây nhiễu quá mức
         mosaic         = 1.0,
-        mixup          = 0.1,
-        copy_paste     = 0.1,
-        # Checkpoint
+        mixup          = 0.0,   # tắt
+        copy_paste     = 0.0,   # tắt
+        # ── Checkpoint ──
         save           = True,
         save_period    = 10,
         exist_ok       = True,
         verbose        = True,
-        # LR schedule
-        warmup_epochs  = 3,
-        warmup_bias_lr = 0.1,
+        # ── LR schedule ──
+        warmup_epochs  = 5,     # warmup dài hơn để gradient ổn định từ đầu
+        warmup_bias_lr = 0.01,
         cos_lr         = True,
-        # Cache anh vao RAM neu du bo nho
+        # ── Weight decay chặt hơn để tránh overfit ──
+        weight_decay   = 0.001,
+        # ── Cache ──
         cache          = "ram" if use_cache else False,
     )
 
