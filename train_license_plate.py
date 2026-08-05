@@ -123,20 +123,23 @@ def make_data_yaml() -> Path:
 # ─────────────────────────────────────────────
 AUGMENT_ARGS = dict(
     # Màu sắc – rất nhẹ, biển số VN màu chuẩn
-    hsv_h       = 0.01,
-    hsv_s       = 0.2,
-    hsv_v       = 0.2,
+    hsv_h        = 0.01,
+    hsv_s        = 0.2,
+    hsv_v        = 0.2,
     # Hình học – biển số gắn cố định trên xe, ít biến dạng
-    degrees     = 3.0,      # xoay tối đa 3 độ
-    translate   = 0.05,
-    scale       = 0.3,      # zoom nhẹ
-    shear       = 0.5,
-    perspective = 0.0,
-    flipud      = 0.0,      # TUYET DOI khong lat doc
-    fliplr      = 0.5,      # lat ngang ok (bien so doi xung)
-    mosaic      = 0.5,      # giam xuong 0.5, du tang cuong ma khong qua nhieu
-    mixup       = 0.0,      # tat – dataset nho khong can
-    copy_paste  = 0.0,      # tat
+    degrees      = 3.0,
+    translate    = 0.05,
+    scale        = 0.3,
+    shear        = 0.5,
+    perspective  = 0.0,
+    flipud       = 0.0,     # TUYET DOI khong lat doc
+    fliplr       = 0.5,
+    # Mosaic tat dan o cuoi train (close_mosaic) de acc on dinh
+    mosaic       = 0.5,
+    mixup        = 0.0,
+    copy_paste   = 0.0,
+    # Dong mosaic som o cuoi de acc khong bi nhay cuoi train
+    close_mosaic = 20,      # tat mosaic truoc 20 epoch cuoi
 )
 
 
@@ -170,13 +173,16 @@ def train_stage1(data_yaml: Path, cache_mode: str) -> Path:
         patience       = 15,
         lr0            = STAGE1_LR0,
         lrf            = STAGE1_LRF,
-        optimizer      = "AdamW",
+        optimizer      = "SGD",           # SGD + momentum on dinh hon AdamW khi freeze
+        momentum       = 0.937,
         amp            = AMP,
-        freeze         = STAGE1_FREEZE,   # dong bang backbone
+        freeze         = STAGE1_FREEZE,
         warmup_epochs  = STAGE1_WARMUP_EPOCHS,
+        warmup_momentum= 0.8,             # momentum tang dan trong warmup
         warmup_bias_lr = 0.001,
         cos_lr         = True,
         weight_decay   = 0.0005,
+        dropout        = 0.1,             # dropout nhe tranh overfit dataset nho
         save           = True,
         save_period    = 5,
         exist_ok       = True,
@@ -223,15 +229,18 @@ def train_stage2(data_yaml: Path, stage1_weight: Path, cache_mode: str) -> Path:
         project        = PROJECT,
         name           = STAGE2_NAME,
         patience       = STAGE2_PATIENCE,
-        lr0            = STAGE2_LR0,      # rat nho – "buoc nho ma chac"
+        lr0            = STAGE2_LR0,
         lrf            = STAGE2_LRF,
-        optimizer      = "AdamW",
+        optimizer      = "AdamW",         # AdamW tot hon khi fine-tune toan bo
+        momentum       = 0.937,
         amp            = AMP,
         freeze         = 0,               # mo toan bo
         warmup_epochs  = STAGE2_WARMUP_EPOCHS,
+        warmup_momentum= 0.8,
         warmup_bias_lr = 0.0001,
         cos_lr         = True,
         weight_decay   = 0.0005,
+        dropout        = 0.0,             # tat dropout o stage 2, model da on dinh
         save           = True,
         save_period    = 10,
         exist_ok       = True,
