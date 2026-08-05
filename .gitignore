@@ -1,3 +1,6 @@
+# File yaml runtime (tạo tự động khi chạy, chứa path tuyệt đối)
+data_train.yaml
+
 # Kết quả train
 runs/
 
