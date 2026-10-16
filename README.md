@@ -21,8 +21,9 @@ A rigorous, reproducible benchmark and deployment pipeline comparing a high-thro
 - [8. Standardized CPU Benchmark](#8-standardized-cpu-benchmark)
 - [9. Reproducible Inference](#9-reproducible-inference)
 - [10. Packaging & Artifact Integrity](#10-packaging--artifact-integrity)
-- [11. Limitations & Scope](#11-limitations--scope)
-- [12. Repository Structure](#12-repository-structure)
+- [11. Two-Stage ALPR & Character Recognition (OCR) Integration](#11-two-stage-alpr--character-recognition-ocr-integration)
+- [12. Limitations & Scope](#12-limitations--scope)
+- [13. Repository Structure](#13-repository-structure)
 
 ---
 
@@ -260,17 +261,51 @@ All model checkpoints are cryptographically hashed and tracked in [`weights_mani
 
 ---
 
-## 11. Limitations & Scope
+## 11. Two-Stage ALPR & Character Recognition (OCR) Integration
+
+While this benchmark focuses on the core localization engine (YOLOv8 Plate Detector), the system is designed to integrate into a **Two-Stage Automatic License Plate Recognition (ALPR)** pipeline:
+
+```
+Camera Frame
+    │
+    ▼
+[Stage 1: Plate Localization] ────────► Custom YOLOv8n / YOLOv8l (ONNX Runtime)
+    │                                    Output: [x1, y1, x2, y2, confidence]
+    ▼
+Coordinate Unscaling & Dynamic Crop
+    │
+    ▼
+Aspect-Ratio & Padding Expansion (+8% Width, +12% Height to preserve edge characters)
+    │
+    ▼
+[Stage 2: Character Recognition] ──────► Asynchronous OCR Worker
+                                         Engine: On-Device Text Recognizer (e.g., Google ML Kit)
+                                         Regex Postprocessing: Two-line Vietnamese Plate Format
+                                         Format 1: "[Province/City Letters]-[Serial Number]" (e.g., "30A-123.45")
+                                         Format 2: Single-line long plate format
+```
+
+### Decoupled Asynchronous OCR Worker Architecture
+In streaming applications (e.g., parking gate access control), executing text recognition synchronously within the detector loop introduces severe frame jitter because character segmentation and text recognition take 20–50 ms.
+
+To solve this, the application implements a **decoupled single-slot OCR worker**:
+- **Non-blocking frame dispatch**: The detector thread drops frames into an `AtomicReference` single-slot queue without waiting for OCR.
+- **Frame-ID versioning**: Each request carries an incrementing `frameId`. The OCR worker processes only the freshest frame, dropping intermediate stale frames when the queue is occupied.
+- **State cache**: Latest recognized plate text is attached to live detection overlays without stalling the real-time inference loop.
+
+---
+
+## 12. Limitations & Scope
 
 To ensure engineering rigor, the following boundaries of this study are stated:
 1. **Test Set Scope**: The test split contains 101 images / 101 bounding boxes under standard lighting conditions; metrics do not generalize to severe occlusions, extreme weather, or acute camera angles.
 2. **Hardware Environment**: Profiling was conducted on an x86 workstation CPU; inference speeds will vary significantly on embedded ARM boards (Raspberry Pi, Jetson) or mobile devices.
 3. **Resolution Sensitivity**: The compact variant at $224 \times 224$ exhibits a $20.6\%$ miss rate on small distant plates. Full $640 \times 640$ resolution is recommended where camera-to-vehicle distances exceed standard parking gate ranges.
-4. **Task Boundary**: This project evaluates vehicle license plate localization and bounding box regression; alphanumeric optical character recognition (OCR) was decoupled from the benchmark scope.
+4. **Task Boundary & Evaluation Metrics**: The quantitative benchmark evaluates vehicle license plate localization and bounding box regression (mAP, IoU, Precision, Recall). Character recognition (OCR) is integrated downstream via a decoupled execution worker, but alphanumeric error metrics (CER/WER) were not evaluated quantitatively due to the lack of character-level ground truth strings in the underlying dataset.
 
 ---
 
-## 12. Repository Structure
+## 13. Repository Structure
 
 ```
 titsmat-parking/
