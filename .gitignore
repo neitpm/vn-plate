@@ -39,6 +39,7 @@ Thumbs.db
 
 # Datasets & Large Archives
 datasets/
+hf_staging/
 *.cache
 *.zip
 vn-plate-20260805T073942Z-1-001/
