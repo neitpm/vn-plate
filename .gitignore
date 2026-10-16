@@ -22,6 +22,7 @@ env/
 # Model weights
 *.pt
 *.onnx
+!vn-plate-app/app/src/main/assets/best.onnx
 *.engine
 *.tflite
 
@@ -35,3 +36,19 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Datasets & Large Archives
+datasets/
+*.cache
+*.zip
+vn-plate-20260805T073942Z-1-001/
+
+# Android Build & Gradle
+.gradle/
+.kotlin/
+build/
+**/build/
+local.properties
+*.apk
+*.aab
+

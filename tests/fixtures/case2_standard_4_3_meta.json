@@ -1,0 +1,47 @@
+{
+  "case_id": "case2_standard_4_3",
+  "source_file": "CarLongPlate113_jpg.rf.d83935b14070679cb3810ab5f09d014e.jpg",
+  "orig_width": 472,
+  "orig_height": 303,
+  "aspect_ratio": 1.5577557755775577,
+  "target_size": 224,
+  "scale_ratio": 0.4745762711864407,
+  "pad_left": 0,
+  "pad_top": 40,
+  "pad_right": 0,
+  "pad_bottom": 40,
+  "unpadded_width": 224,
+  "unpadded_height": 144,
+  "conf_threshold": 0.5,
+  "iou_threshold": 0.5,
+  "num_detections": 1,
+  "detections": [
+    {
+      "confidence": 0.6237914562225342,
+      "box_224_xyxy": [
+        68.77601623535156,
+        76.92216491699219,
+        118.15303039550781,
+        92.62913513183594
+      ],
+      "box_224_cxcywh": [
+        93.46452331542969,
+        84.77565002441406,
+        49.37701416015625,
+        15.70697021484375
+      ],
+      "box_orig_xyxy": [
+        144.92089135306222,
+        77.80027607509068,
+        248.96531404767717,
+        110.8971061706543
+      ],
+      "box_orig_cxcywh": [
+        196.9431027003697,
+        94.34869112287248,
+        104.04442269461495,
+        33.09683009556362
+      ]
+    }
+  ]
+}

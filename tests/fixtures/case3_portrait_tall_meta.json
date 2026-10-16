@@ -1,0 +1,47 @@
+{
+  "case_id": "case3_portrait_tall",
+  "source_file": "case3_portrait_source.jpg",
+  "orig_width": 196,
+  "orig_height": 303,
+  "aspect_ratio": 0.6468646864686468,
+  "target_size": 224,
+  "scale_ratio": 0.7392739273927392,
+  "pad_left": 39,
+  "pad_top": 0,
+  "pad_right": 40,
+  "pad_bottom": 0,
+  "unpadded_width": 145,
+  "unpadded_height": 224,
+  "conf_threshold": 0.5,
+  "iou_threshold": 0.5,
+  "num_detections": 1,
+  "detections": [
+    {
+      "confidence": 0.9840425848960876,
+      "box_224_xyxy": [
+        151.11293029785156,
+        187.56005859375,
+        184.4714813232422,
+        208.22314453125
+      ],
+      "box_224_cxcywh": [
+        167.79220581054688,
+        197.8916015625,
+        33.358551025390625,
+        20.6630859375
+      ],
+      "box_orig_xyxy": [
+        151.65275839396887,
+        253.7084721156529,
+        196.77615553992138,
+        281.65898568289623
+      ],
+      "box_orig_cxcywh": [
+        174.21445696694514,
+        267.68372889927457,
+        45.12339714595251,
+        27.95051356724332
+      ]
+    }
+  ]
+}

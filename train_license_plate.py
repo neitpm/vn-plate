@@ -48,11 +48,11 @@ STAGE1_FREEZE        = 10       # dong bang 10 layer dau (backbone) cua yolov8l
 # ── Giai doan 2: Unfreeze toan bo, fine-tune nhe ──
 # Mo backbone ra, chinh sua tung chi tiet voi lr rat nho
 STAGE2_NAME          = "vn_plate_stage2_finetune"
-STAGE2_EPOCHS        = 200      # nhieu epoch de hoc ky
-STAGE2_LR0           = 0.0001   # rat nho – "buoc nho ma chac"
-STAGE2_LRF           = 0.01     # decay xuong 1e-6
-STAGE2_WARMUP_EPOCHS = 10       # warmup dai de backbone khong bi shock
-STAGE2_PATIENCE      = 50       # cho model du thoi gian
+STAGE2_EPOCHS        = 300      # nhiều hơn để box regression hội tụ
+STAGE2_LR0           = 0.0001
+STAGE2_LRF           = 0.01
+STAGE2_WARMUP_EPOCHS = 10
+STAGE2_PATIENCE      = 80       # kiên nhẫn hơn vì mAP50-95 cải thiện chậm
 
 
 # ─────────────────────────────────────────────
@@ -122,24 +122,22 @@ def make_data_yaml() -> Path:
 # AUGMENTATION NHẸ – dùng chung cả 2 giai đoạn
 # ─────────────────────────────────────────────
 AUGMENT_ARGS = dict(
-    # Màu sắc – rất nhẹ, biển số VN màu chuẩn
+    # Màu sắc nhẹ
     hsv_h        = 0.01,
     hsv_s        = 0.2,
     hsv_v        = 0.2,
-    # Hình học – biển số gắn cố định trên xe, ít biến dạng
+    # Hình học
     degrees      = 3.0,
     translate    = 0.05,
     scale        = 0.3,
     shear        = 0.5,
     perspective  = 0.0,
-    flipud       = 0.0,     # TUYET DOI khong lat doc
+    flipud       = 0.0,
     fliplr       = 0.5,
-    # Mosaic tat dan o cuoi train (close_mosaic) de acc on dinh
     mosaic       = 0.5,
     mixup        = 0.0,
     copy_paste   = 0.0,
-    # Dong mosaic som o cuoi de acc khong bi nhay cuoi train
-    close_mosaic = 20,      # tat mosaic truoc 20 epoch cuoi
+    close_mosaic = 20,
 )
 
 
@@ -222,8 +220,8 @@ def train_stage2(data_yaml: Path, stage1_weight: Path, cache_mode: str) -> Path:
     model.train(
         data           = str(data_yaml),
         epochs         = STAGE2_EPOCHS,
-        imgsz          = IMG_SIZE,
-        batch          = BATCH_SIZE,
+        imgsz          = 1280,            # tang len 1280 – box khit hon tren anh lon
+        batch          = 8,               # giam batch vi img 1280 nang hon
         workers        = WORKERS,
         device         = DEVICE,
         project        = PROJECT,
@@ -231,16 +229,20 @@ def train_stage2(data_yaml: Path, stage1_weight: Path, cache_mode: str) -> Path:
         patience       = STAGE2_PATIENCE,
         lr0            = STAGE2_LR0,
         lrf            = STAGE2_LRF,
-        optimizer      = "AdamW",         # AdamW tot hon khi fine-tune toan bo
+        optimizer      = "AdamW",
         momentum       = 0.937,
         amp            = AMP,
-        freeze         = 0,               # mo toan bo
+        freeze         = 0,
         warmup_epochs  = STAGE2_WARMUP_EPOCHS,
         warmup_momentum= 0.8,
         warmup_bias_lr = 0.0001,
         cos_lr         = True,
         weight_decay   = 0.0005,
-        dropout        = 0.0,             # tat dropout o stage 2, model da on dinh
+        dropout        = 0.0,
+        # Tang box loss weight de bbox khit hon → mAP50-95 cao hon
+        box            = 10.0,            # mac dinh 7.5, tang len 10
+        cls            = 0.3,             # giam cls vi chi 1 class
+        dfl            = 1.5,
         save           = True,
         save_period    = 10,
         exist_ok       = True,

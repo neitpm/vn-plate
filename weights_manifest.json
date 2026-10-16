@@ -1,0 +1,26 @@
+{
+  "yolov8n_edge_onnx": {
+    "relative_path": "vn-plate-app/app/src/main/assets/best.onnx",
+    "size_bytes": 12117766,
+    "size_mb": 11.56,
+    "sha256": "28c4c12958f705ae658c6901f2e9e755a7e03f629a73c23750c7d37761af31dd"
+  },
+  "yolov8n_edge_pt": {
+    "relative_path": "vn-plate-20260805T073942Z-1-001/vn-plate/runs/train/vn_plate_nano/weights/best.pt",
+    "size_bytes": 6239978,
+    "size_mb": 5.95,
+    "sha256": "873851543beeb9c6483c07e64b99400d1554a70244862b1cd70b62035b6431c2"
+  },
+  "yolov8l_server_onnx": {
+    "relative_path": "vn-plate-20260805T073942Z-1-001/vn-plate/runs/train/vn_plate_stage2_finetune/weights/best.onnx",
+    "size_bytes": 174714980,
+    "size_mb": 166.62,
+    "sha256": "21f2e3aefc46dadd0b4b7e4a0200d0443644c41e982f9d756ef17231b74eaaa3"
+  },
+  "yolov8l_server_pt": {
+    "relative_path": "vn-plate-20260805T073942Z-1-001/vn-plate/runs/train/vn_plate_stage2_finetune/weights/best.pt",
+    "size_bytes": 87640122,
+    "size_mb": 83.58,
+    "sha256": "8674e24abccf02522f12c34d6829efc3c0e13ab0c53a3ea4850bd6fe5a0671fd"
+  }
+}
