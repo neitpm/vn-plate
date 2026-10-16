@@ -12,18 +12,17 @@ A rigorous, reproducible benchmark and deployment pipeline comparing a high-thro
 
 ## Table of Contents
 - [1. Project Overview](#1-project-overview)
-- [2. Model Variants](#2-model-variants)
-- [3. End-to-End Model Pipeline](#3-end-to-end-model-pipeline)
-- [4. Architecture Documentation](#4-architecture-documentation)
-- [5. Training Protocols](#5-training-protocols)
-- [6. Official Ultralytics Evaluation](#6-official-ultralytics-evaluation)
-- [7. Deployment-Resolution Evaluation](#7-deployment-resolution-evaluation)
-- [8. Standardized CPU Benchmark](#8-standardized-cpu-benchmark)
-- [9. Reproducible Inference](#9-reproducible-inference)
-- [10. Packaging & Artifact Integrity](#10-packaging--artifact-integrity)
-- [11. Two-Stage ALPR & Character Recognition (OCR) Integration](#11-two-stage-alpr--character-recognition-ocr-integration)
-- [12. Limitations & Scope](#12-limitations--scope)
-- [13. Repository Structure](#13-repository-structure)
+- [2. Image Preprocessing & Postprocessing Contract](#2-image-preprocessing--postprocessing-contract)
+- [3. Model Variants & Architecture Documentation](#3-model-variants--architecture-documentation)
+- [4. Training Protocols](#4-training-protocols)
+- [5. Official Ultralytics Evaluation](#5-official-ultralytics-evaluation)
+- [6. Deployment-Resolution Evaluation](#6-deployment-resolution-evaluation)
+- [7. Standardized CPU Benchmark](#7-standardized-cpu-benchmark)
+- [8. Reproducible ONNX & PyTorch Inference](#8-reproducible-onnx--pytorch-inference)
+- [9. Packaging & Artifact Integrity](#9-packaging--artifact-integrity)
+- [10. Plate Crop Pipeline & Application Integration](#10-plate-crop-pipeline--application-integration)
+- [11. Limitations & Scope](#11-limitations--scope)
+- [12. Repository Structure](#12-repository-structure)
 
 ---
 
@@ -44,7 +43,49 @@ This project implements a controlled object detection benchmark focused on Vietn
 
 ---
 
-## 2. Model Variants
+## 2. Image Preprocessing & Postprocessing Contract
+
+The pipeline enforces an Ultralytics-compatible mathematical transformation contract to ensure strict parity between Python training, ONNX export, and standalone execution.
+
+### 2.1. Detector Input Preprocessing
+The detector follows an aspect-ratio preserving letterbox contract:
+
+1. **Read image**: Read source image in BGR format.
+2. **Color space conversion**: Convert BGR to RGB.
+3. **Aspect-ratio scaling**: Compute scale ratio $r = \min(S / H, S / W)$.
+4. **Unpadded resize**: Resize image to $(W_{\text{unpad}}, H_{\text{unpad}}) = (\text{round}(W \cdot r), \text{round}(H \cdot r))$ using bilinear interpolation.
+5. **Symmetric padding**:
+   - Compute residual padding: $dw = (S - W_{\text{unpad}}) / 2$, $dh = (S - H_{\text{unpad}}) / 2$.
+   - Integer rounding: $\text{top} = \text{round}(dh - 0.1)$, $\text{bottom} = \text{round}(dh + 0.1)$, $\text{left} = \text{round}(dw - 0.1)$, $\text{right} = \text{round}(dw + 0.1)$.
+   - Pad border area with neutral constant value `(114, 114, 114)`.
+6. **Target dimensions**:
+   - `640×640` for the server evaluation model.
+   - `224×224` for the compact inference variant.
+7. **Type conversion & Normalization**: Convert pixels to `float32` and scale from $[0, 255]$ to $[0.0, 1.0]$.
+8. **Tensor transposition**: Rearrange layout from HWC to NCHW `[1, 3, S, S]`.
+
+*The letterbox metadata ($r$, $\text{pad\_left}$, $\text{pad\_top}$) is retained to map predicted boxes back to the original image coordinate space.*
+
+### 2.2. Postprocessing & Coordinate Decoding
+The exported ONNX model outputs raw decoded anchor tensors:
+
+$$\text{Shape: } [1, 5, N] \quad \text{representing} \quad [cx, cy, w, h, \text{confidence}]$$
+
+The inference pipeline performs the following postprocessing steps:
+
+1. **Format conversion**: Convert center-format coordinates $[cx, cy, w, h]$ to corner format $[x_1, y_1, x_2, y_2]$:
+   $$x_1 = cx - w / 2, \quad y_1 = cy - h / 2, \quad x_2 = cx + w / 2, \quad y_2 = cy + h / 2$$
+2. **Confidence filtering**: Discard anchor boxes where $\text{confidence} < \text{conf\_threshold}$ (e.g., $0.25$ or $0.50$).
+3. **Greedy Non-Maximum Suppression (NMS)**: Suppress overlapping bounding boxes using an IoU threshold of $\ge 0.50$.
+4. **Inverse letterbox mapping**: Map coordinates back to the original image space:
+   $$x_{\text{orig}} = \frac{x_S - \text{pad\_left}}{r}, \quad y_{\text{orig}} = \frac{y_S - \text{pad\_top}}{r}$$
+5. **Boundary clipping**: Clip coordinates to valid image dimensions $[0, W_{\text{orig}}]$ and $[0, H_{\text{orig}}]$.
+
+![Inference Pipeline Contract](docs/figures/4_inference_pipeline.png)
+
+---
+
+## 3. Model Variants & Architecture Documentation
 
 Two architectural configurations were benchmarked to quantify the performance-computation envelope:
 
@@ -62,72 +103,15 @@ Two architectural configurations were benchmarked to quantify the performance-co
    - **Evaluation Resolution**: $640 \times 640$ (8,400 anchors)
    - *Design Goal*: Maximal spatial feature preservation and distance recall across unconstrained scales.
 
----
-
-## 3. End-to-End Model Pipeline
-
-The pipeline enforces a strict mathematical transformation contract between training, export, and inference:
-
-```
-Dataset Images
-    │
-    ▼
-YOLO Annotations [class, cx, cy, w, h]
-    │
-    ▼
-Partitioned Splits (Train: 704 | Valid: 200 | Test: 101)
-    │
-    ▼
-Ultralytics Training (SGD / AdamW with Cosine Decay)
-    │
-    ▼
-Checkpoint Selection (best.pt by validation mAP@[0.5:0.95])
-    │
-    ▼
-ONNX Export (opset 17, dynamic=False, simplify=True)
-    │
-    ▼
-Letterbox Preprocessing (dh - 0.1 / dh + 0.1 integer rounding, pad=114)
-    │
-    ▼
-Tensor Normalization (BGR -> RGB, Float32 / 255.0, shape: [1, 3, S, S])
-    │
-    ▼
-ONNX Runtime Forward Pass (CPUExecutionProvider)
-    │
-    ▼
-Raw Output Tensor Decode ([1, 5, N] -> [cx, cy, w, h, conf])
-    │
-    ▼
-Confidence Thresholding (conf >= 0.25 / 0.50)
-    │
-    ▼
-Non-Maximum Suppression (Greedy NMS, IoU >= 0.50)
-    │
-    ▼
-Inverse Letterbox Coordinate Mapping (x_orig = (x_S - pad_left) / scale_ratio)
-    │
-    ▼
-Final Bounding Boxes in Original Pixel Coordinate Space
-```
-
-![Inference Pipeline Contract](docs/figures/4_inference_pipeline.png)
-
----
-
-## 4. Architecture Documentation
-
-Detailed volumetric tensor blocks for both model variants:
-
-### 4.1. YOLOv8n Compact Model
+### 3.1. YOLOv8n Compact Architecture
 ![YOLOv8n Architecture](docs/figures/2_yolov8n_architecture.png)
 
-### 4.2. YOLOv8l Server Model
+### 3.2. YOLOv8l Server Architecture
 ![YOLOv8l Architecture](docs/figures/3_yolov8l_architecture.png)
 
 ---
 
-## 5. Training Protocols
+## 4. Training Protocols
 
 Training was conducted under controlled, reproducible recipes logged in `runs/train/`:
 
@@ -146,7 +130,7 @@ Training was conducted under controlled, reproducible recipes logged in `runs/tr
 
 ---
 
-## 6. Official Ultralytics Evaluation
+## 5. Official Ultralytics Evaluation
 
 Evaluated via the official `model.val()` runner using native PyTorch checkpoints on GPU (`NVIDIA GeForce RTX 5060 Ti`):
 
@@ -161,7 +145,7 @@ Evaluated via the official `model.val()` runner using native PyTorch checkpoints
 
 ---
 
-## 7. Deployment-Resolution Evaluation
+## 6. Deployment-Resolution Evaluation
 
 YOLOv8n was trained at $640 \times 640$ but evaluated at $224 \times 224$ to quantify the impact of downsampling on spatial feature representation:
 
@@ -189,7 +173,7 @@ Plate area was categorized relative to total image area (IoU threshold $0.5$):
 
 ---
 
-## 8. Standardized CPU Benchmark
+## 7. Standardized CPU Benchmark
 
 Latency was profiled under an explicit, controlled measurement protocol:
 - **CPU**: Intel Core i5-14600K (14 physical cores, 20 logical threads).
@@ -207,16 +191,9 @@ Latency was profiled under an explicit, controlled measurement protocol:
 
 ---
 
-## 9. Reproducible Inference
+## 8. Reproducible ONNX & PyTorch Inference
 
 A standalone inference script [`scripts/infer.py`](scripts/infer.py) is provided to execute inference independently from PyTorch or ONNX graphs.
-
-### Preprocessing & Tensor Contract
-- **Input `images`**: `[1, 3, S, S]` (Float32, RGB order, normalized to $[0.0, 1.0]$).
-- **Output `output0`**: `[1, 5, N]` (Float32):
-  - Values: `[cx, cy, w, h, conf]`. Coordinates are decoded absolute pixels in $S \times S$ space.
-  - Confidence passes through `Sigmoid` ($conf \in [0, 1]$).
-  - `end2end: False` (Client-side NMS and inverse letterbox mapping required).
 
 ### CLI Usage Examples
 
@@ -246,7 +223,7 @@ python scripts/infer.py \
 
 ---
 
-## 10. Packaging & Artifact Integrity
+## 9. Packaging & Artifact Integrity
 
 All model checkpoints are cryptographically hashed and tracked in [`weights_manifest.json`](weights_manifest.json):
 
@@ -261,41 +238,31 @@ All model checkpoints are cryptographically hashed and tracked in [`weights_mani
 
 ---
 
-## 11. Two-Stage ALPR & Character Recognition (OCR) Integration
+## 10. Plate Crop Pipeline & Application Integration
 
-While this benchmark focuses on the core localization engine (YOLOv8 Plate Detector), the system is designed to integrate into a **Two-Stage Automatic License Plate Recognition (ALPR)** pipeline:
+While the primary focus of this benchmark is the core detection model contract, an application prototype demonstrates how the detector integrates into a two-stage ALPR system.
 
-```
-Camera Frame
-    │
-    ▼
-[Stage 1: Plate Localization] ────────► Custom YOLOv8n / YOLOv8l (ONNX Runtime)
-    │                                    Output: [x1, y1, x2, y2, confidence]
-    ▼
-Coordinate Unscaling & Dynamic Crop
-    │
-    ▼
-Aspect-Ratio & Padding Expansion (+8% Width, +12% Height to preserve edge characters)
-    │
-    ▼
-[Stage 2: Character Recognition] ──────► Asynchronous OCR Worker
-                                         Engine: On-Device Text Recognizer (e.g., Google ML Kit)
-                                         Regex Postprocessing: Two-line Vietnamese Plate Format
-                                         Format 1: "[Province/City Letters]-[Serial Number]" (e.g., "30A-123.45")
-                                         Format 2: Single-line long plate format
-```
+### 10.1. Plate Crop Preprocessing for OCR
+For each bounding box detected in the original unletterboxed image:
 
-### Decoupled Asynchronous OCR Worker Architecture
-In streaming applications (e.g., parking gate access control), executing text recognition synchronously within the detector loop introduces severe frame jitter because character segmentation and text recognition take 20–50 ms.
+1. **Crop extraction**: Crop the detected license plate region from the high-resolution source frame.
+2. **Dynamic padding expansion**: Expand the crop bounding box by $+8\%$ horizontally and $+12\%$ vertically. This expansion prevents cutting off edge characters or mounting bolts.
+3. **Boundary clipping**: Constrain expanded crop coordinates to valid image boundaries.
+4. **OCR recognition**: Pass the cropped image patch to the downstream text recognizer (e.g., on-device Google ML Kit).
+5. **Format normalization**: Apply Vietnamese license plate syntax rules:
+   - Two-line plate: `[Province/City Letters]-[Serial Number]` (e.g., `30A-123.45`).
+   - Single-line long plate: Normalized alphanumeric alphanumeric filtering.
 
-To solve this, the application implements a **decoupled single-slot OCR worker**:
-- **Non-blocking frame dispatch**: The detector thread drops frames into an `AtomicReference` single-slot queue without waiting for OCR.
-- **Frame-ID versioning**: Each request carries an incrementing `frameId`. The OCR worker processes only the freshest frame, dropping intermediate stale frames when the queue is occupied.
-- **State cache**: Latest recognized plate text is attached to live detection overlays without stalling the real-time inference loop.
+### 10.2. Decoupled Asynchronous OCR Worker
+OCR latency depends heavily on the execution device and text density. Executing text recognition synchronously inside the camera/detector loop causes frame drops. The prototype implements a decoupled single-slot worker:
+
+- **Non-blocking dispatch**: The detector thread posts the latest plate crop to an `AtomicReference` single-slot queue without waiting for OCR completion.
+- **Frame-ID versioning**: Each request carries a monotonically increasing `frameId`. The worker processes only the freshest frame, dropping intermediate stale frames when the OCR thread is occupied.
+- **State cache**: Latest recognized plate text is cached and rendered onto the overlay view without stalling the real-time detector loop.
 
 ---
 
-## 12. Limitations & Scope
+## 11. Limitations & Scope
 
 To ensure engineering rigor, the following boundaries of this study are stated:
 1. **Test Set Scope**: The test split contains 101 images / 101 bounding boxes under standard lighting conditions; metrics do not generalize to severe occlusions, extreme weather, or acute camera angles.
@@ -305,7 +272,7 @@ To ensure engineering rigor, the following boundaries of this study are stated:
 
 ---
 
-## 13. Repository Structure
+## 12. Repository Structure
 
 ```
 titsmat-parking/
@@ -324,7 +291,7 @@ titsmat-parking/
 │   └── visualize_architecture.py         # Technical architecture diagram generator
 ├── tests/
 │   └── fixtures/                         # Preprocessed tensors, metadata & verification cases
-├── vn-plate-app/                         # Android application source (uses bundled ONNX)
+├── vn-plate-app/                         # Android application prototype (uses bundled ONNX)
 ├── train_license_plate.py                # Two-stage YOLOv8 training script
 ├── weights_manifest.json                 # Cryptographic SHA-256 manifest
 └── README.md                             # Technical benchmark documentation
