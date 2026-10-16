@@ -4,6 +4,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.12+-ee4c2c.svg)](https://pytorch.org/)
 [![Ultralytics](https://img.shields.io/badge/YOLOv8-Ultralytics-00ffff.svg)](https://docs.ultralytics.com/)
 [![ONNX Runtime](https://img.shields.io/badge/ONNX%20Runtime-1.18+-blueviolet.svg)](https://onnxruntime.ai/)
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20Hub-yellow.svg)](https://huggingface.co/neitpm/vn-plate-detection-benchmark)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A rigorous, reproducible benchmark and deployment pipeline comparing a high-throughput compact detector (**YOLOv8n**, 3.0M params) and a high-capacity server detector (**YOLOv8l**, 43.6M params) for Vietnamese vehicle license plate detection.
@@ -225,14 +226,40 @@ python scripts/infer.py \
 
 ## 9. Packaging & Artifact Integrity
 
-All model checkpoints are cryptographically hashed and tracked in [`weights_manifest.json`](weights_manifest.json):
+All model checkpoints are cryptographically hashed and published on Hugging Face Hub:
 
-| Identifier | Checkpoint File | Size | SHA-256 Checksum |
-| :--- | :--- | :---: | :--- |
-| `yolov8n_edge_onnx` | `vn-plate-app/app/src/main/assets/best.onnx` | 11.56 MB | `28c4c12958f705ae658c6901f2e9e755a7e03f629a73c23750c7d37761af31dd` |
-| `yolov8n_edge_pt` | `.../vn_plate_nano/weights/best.pt` | 5.95 MB | `873851543beeb9c6483c07e64b99400d1554a70244862b1cd70b62035b6431c2` |
-| `yolov8l_server_onnx` | `.../vn_plate_stage2_finetune/weights/best.onnx` | 166.62 MB | `21f2e3aefc46dadd0b4b7e4a0200d0443644c41e982f9d756ef17231b74eaaa3` |
-| `yolov8l_server_pt` | `.../vn_plate_stage2_finetune/weights/best.pt` | 83.58 MB | `8674e24abccf02522f12c34d6829efc3c0e13ab0c53a3ea4850bd6fe5a0671fd` |
+**Hugging Face Repository**: [huggingface.co/neitpm/vn-plate-detection-benchmark](https://huggingface.co/neitpm/vn-plate-detection-benchmark)
+
+| Identifier | Checkpoint File | Size | SHA-256 Checksum | Hugging Face Path |
+| :--- | :--- | :---: | :--- | :--- |
+| `yolov8n_edge_onnx` | `vn-plate-app/app/src/main/assets/best.onnx` | 11.56 MB | `28c4c12958f705ae658c6901f2e9e755a7e03f629a73c23750c7d37761af31dd` | `weights/yolov8n_edge.onnx` |
+| `yolov8n_edge_pt` | `.../vn_plate_nano/weights/best.pt` | 5.95 MB | `873851543beeb9c6483c07e64b99400d1554a70244862b1cd70b62035b6431c2` | `weights/yolov8n_edge.pt` |
+| `yolov8l_server_onnx` | `.../vn_plate_stage2_finetune/weights/best.onnx` | 166.62 MB | `21f2e3aefc46dadd0b4b7e4a0200d0443644c41e982f9d756ef17231b74eaaa3` | `weights/yolov8l_server.onnx` |
+| `yolov8l_server_pt` | `.../vn_plate_stage2_finetune/weights/best.pt` | 83.58 MB | `8674e24abccf02522f12c34d6829efc3c0e13ab0c53a3ea4850bd6fe5a0671fd` | `weights/yolov8l_server.pt` |
+
+### Download via `huggingface_hub`
+
+Download verified weights directly in Python:
+
+```python
+from huggingface_hub import hf_hub_download
+
+# Download compact YOLOv8n ONNX model
+model_path = hf_hub_download(
+    repo_id="neitpm/vn-plate-detection-benchmark",
+    filename="weights/yolov8n_edge.onnx"
+)
+print("Downloaded checkpoint to:", model_path)
+```
+
+Or download the entire release snapshot:
+
+```python
+from huggingface_hub import snapshot_download
+
+snapshot_dir = snapshot_download(repo_id="neitpm/vn-plate-detection-benchmark")
+print("Downloaded snapshot to:", snapshot_dir)
+```
 
 *Git Hygiene: Raw datasets, large zip backups, and intermediate training caches are excluded from version control via `.gitignore`.*
 
