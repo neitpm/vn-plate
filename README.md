@@ -65,22 +65,24 @@ The detector follows an aspect-ratio preserving letterbox contract:
 7. **Type conversion & Normalization**: Convert pixels to `float32` and scale from $[0, 255]$ to $[0.0, 1.0]$.
 8. **Tensor transposition**: Rearrange layout from HWC to NCHW `[1, 3, S, S]`.
 
-*The letterbox metadata ($r$, $\text{pad\_left}$, $\text{pad\_top}$) is retained to map predicted boxes back to the original image coordinate space.*
+*The letterbox metadata (`scale_ratio`, `pad_left`, `pad_top`) is retained to map predicted boxes back to the original image coordinate space.*
 
 ### 2.2. Postprocessing & Coordinate Decoding
 The exported ONNX model outputs raw decoded anchor tensors:
 
-$$\text{Shape: } [1, 5, N] \quad \text{representing} \quad [cx, cy, w, h, \text{confidence}]$$
+`Shape: [1, 5, N] representing [cx, cy, w, h, confidence]`
 
 The inference pipeline performs the following postprocessing steps:
 
-1. **Format conversion**: Convert center-format coordinates $[cx, cy, w, h]$ to corner format $[x_1, y_1, x_2, y_2]$:
-   $$x_1 = cx - w / 2, \quad y_1 = cy - h / 2, \quad x_2 = cx + w / 2, \quad y_2 = cy + h / 2$$
-2. **Confidence filtering**: Discard anchor boxes where $\text{confidence} < \text{conf\_threshold}$ (e.g., $0.25$ or $0.50$).
-3. **Greedy Non-Maximum Suppression (NMS)**: Suppress overlapping bounding boxes using an IoU threshold of $\ge 0.50$.
+1. **Format conversion**: Convert center-format coordinates `[cx, cy, w, h]` to corner format `[x1, y1, x2, y2]`:
+   - `x1 = cx - w / 2`, `y1 = cy - h / 2`
+   - `x2 = cx + w / 2`, `y2 = cy + h / 2`
+2. **Confidence filtering**: Discard anchor boxes where `confidence < conf_threshold` (e.g., `0.25` or `0.50`).
+3. **Greedy Non-Maximum Suppression (NMS)**: Suppress overlapping bounding boxes using an IoU threshold of `>= 0.50`.
 4. **Inverse letterbox mapping**: Map coordinates back to the original image space:
-   $$x_{\text{orig}} = \frac{x_S - \text{pad\_left}}{r}, \quad y_{\text{orig}} = \frac{y_S - \text{pad\_top}}{r}$$
-5. **Boundary clipping**: Clip coordinates to valid image dimensions $[0, W_{\text{orig}}]$ and $[0, H_{\text{orig}}]$.
+   - `x_orig = (x_S - pad_left) / scale_ratio`
+   - `y_orig = (y_S - pad_top) / scale_ratio`
+5. **Boundary clipping**: Clip coordinates to valid image dimensions `[0, W_orig]` and `[0, H_orig]`.
 
 ![Inference Pipeline Contract](docs/figures/4_inference_pipeline.png)
 
